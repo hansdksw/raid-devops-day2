@@ -6,7 +6,7 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "build": "tsc",
-    "dev": "ts-node src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "test": "vitest --run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --run --coverage"
@@ -26,6 +26,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
