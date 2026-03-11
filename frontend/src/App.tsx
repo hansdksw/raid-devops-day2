@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
+// Import your OTel instruments
+import { unreliableBtnCounter, apiLatencyHistogram, logger } from './tracer'
+import { SeverityNumber } from '@opentelemetry/api-logs'
 
 interface User {
   id: number
@@ -24,6 +27,11 @@ function App() {
   const [unreliableLoading, setUnreliableLoading] = useState(false)
 
   useEffect(() => {
+    logger.emit({
+      severityNumber: SeverityNumber.INFO,
+      body: 'App initialized: Fetching initial data',
+    });
+
     Promise.all([
       fetch(`${API_URL}/api/users`).then(res => res.json()),
       fetch(`${API_URL}/api/companies`).then(res => res.json())
@@ -33,30 +41,67 @@ function App() {
         setCompanies(companiesData)
         setLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         setError('Failed to load data')
         setLoading(false)
+        logger.emit({
+          severityNumber: SeverityNumber.ERROR,
+          body: 'Initial data fetch failed',
+          attributes: { error: String(err) }
+        });
       })
   }, [])
 
   const callUnreliable = useCallback(() => {
-    setUnreliableLoading(true)
+    const startTime = performance.now(); // Start timer for Histogram
+    setUnreliableLoading(true);
+
+    // 1. Increment Metric: Button Clicked
+    unreliableBtnCounter.add(1, { 'action': 'click' });
+
     fetch(`${API_URL}/api/unreliable`)
       .then(async res => {
+        const duration = performance.now() - startTime;
+
+        // 2. Record Metric: API Latency
+        apiLatencyHistogram.record(duration, { 'status_code': res.status });
+
         if (!res.ok) {
-          const text = await res.text()
-          setUnreliable({ status: 'error', message: `HTTP ${res.status} — ${text.slice(0, 120)}` })
+          const text = await res.text();
+          const errorMsg = `HTTP ${res.status} — ${text.slice(0, 120)}`;
+          setUnreliable({ status: 'error', message: errorMsg });
+
+          // 3. Log Error
+          logger.emit({
+            severityNumber: SeverityNumber.WARN,
+            body: 'Unreliable API returned an error status',
+            attributes: { status: res.status, message: text }
+          });
         } else {
-          const data = await res.json()
-          setUnreliable({ status: 'ok', message: data.message, timestamp: data.timestamp })
+          const data = await res.json();
+          setUnreliable({ status: 'ok', message: data.message, timestamp: data.timestamp });
+
+          // 4. Log Success
+          logger.emit({
+            severityNumber: SeverityNumber.INFO,
+            body: 'Unreliable API call successful',
+            attributes: { duration_ms: Math.round(duration) }
+          });
         }
       })
       .catch(err => {
-        setUnreliable({ status: 'error', message: String(err) })
+        setUnreliable({ status: 'error', message: String(err) });
+
+        logger.emit({
+          severityNumber: SeverityNumber.ERROR,
+          body: 'Network error calling unreliable API',
+          attributes: { error: String(err) }
+        });
       })
       .finally(() => setUnreliableLoading(false))
   }, [])
 
+  // ... (rest of your styles and JSX remains the same)
   const tableStyle: React.CSSProperties = {
     width: '100%',
     borderCollapse: 'collapse',
@@ -78,12 +123,12 @@ function App() {
 
   const unreliableBg =
     unreliable.status === 'ok' ? '#e6ffed' :
-    unreliable.status === 'error' ? '#fff0f0' : '#fafafa'
+      unreliable.status === 'error' ? '#fff0f0' : '#fafafa'
 
   const unreliableBadge =
     unreliable.status === 'ok' ? { text: 'SUCCESS', color: '#2e7d32' } :
-    unreliable.status === 'error' ? { text: 'FAILED', color: '#c62828' } :
-    { text: 'IDLE', color: '#888' }
+      unreliable.status === 'error' ? { text: 'FAILED', color: '#c62828' } :
+        { text: 'IDLE', color: '#888' }
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '900px', margin: '40px auto', padding: '0 20px' }}>
