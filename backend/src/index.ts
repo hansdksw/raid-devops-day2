@@ -1,3 +1,4 @@
+import './tracer';
 import express from 'express';
 import cors from 'cors';
 
@@ -46,6 +47,20 @@ app.get('/api/companies', (req, res) => {
   const domains = users.map(user => extractCompanyDomain(user.email));
   const uniqueDomains = Array.from(new Set(domains));
   res.json(uniqueDomains);
+});
+
+// Unreliable endpoint: fails ~50% of the time
+// The auto-instrumented Express span will be marked as error in Jaeger automatically
+app.get('/api/unreliable', (req, res) => {
+  if (Math.random() < 0.5) {
+    // Throwing will cause the auto-instrumented span to record the error
+    throw new Error('Simulated intermittent failure');
+  }
+  res.json({
+    status: 'ok',
+    message: 'You got lucky — this endpoint fails ~50% of the time.',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.listen(PORT, () => {
