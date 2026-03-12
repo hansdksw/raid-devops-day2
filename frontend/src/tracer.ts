@@ -21,8 +21,14 @@ const resource = resourceFromAttributes({
 });
 
 // 1. Setup Tracing
-const tracerProvider = new WebTracerProvider({ resource });
-tracerProvider.addSpanProcessor(new BatchSpanProcessor(new OTLPTraceExporter({ url: `${BASE_URL}/v1/traces` })));
+const tracerProvider = new WebTracerProvider({
+  resource,
+  spanProcessors: [
+    new BatchSpanProcessor(
+      new OTLPTraceExporter({ url: `${BASE_URL}/v1/traces` })
+    ),
+  ],
+});
 tracerProvider.register();
 
 // 2. Setup Metrics
@@ -38,8 +44,14 @@ const meterProvider = new MeterProvider({
 metrics.setGlobalMeterProvider(meterProvider);
 
 // 3. Setup Logs
-const loggerProvider = new LoggerProvider({ resource });
-loggerProvider.addLogRecordProcessor(new BatchLogRecordProcessor(new OTLPLogExporter({ url: `${BASE_URL}/v1/logs` })));
+const loggerProvider = new LoggerProvider({
+  resource,
+  processors: [
+    new BatchLogRecordProcessor(
+      new OTLPLogExporter({ url: `${BASE_URL}/v1/logs` })
+    ),
+  ],
+});
 logs.setGlobalLoggerProvider(loggerProvider);
 
 // 4. Register Auto-instrumentation (Fetch, XHR, etc.)
